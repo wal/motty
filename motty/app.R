@@ -4,6 +4,7 @@ library(shiny)
 library(dplyr)
 library(data.table)
 library(ggplot2)
+library(DT)
 
 premier_league_2017_2018_url <- "http://www.football-data.co.uk/mmz4281/1718/E0.csv"
 
@@ -77,29 +78,32 @@ ui <- fluidPage(
   
   sidebarLayout(
     sidebarPanel(
-      
       selectInput(inputId = "home_team",
                   label = "Home Team:",
-                  choices = teams),
+                  choices = teams,
+                  selected = head(teams, 1)),
       
       selectInput(inputId = "away_team",
                   label = "Away Team:",
-                  choices = teams)
+                  choices = teams,
+                  selected = tail(teams, 1))
     ),
     
     mainPanel(
-      plotOutput(outputId = "matchResultPlot", height = 400),
-      tableOutput("matchResultTable"),
-      plotOutput(outputId = "homeGoalsPlot", height = 200),
-      plotOutput(outputId = "awayGoalsPlot", height = 200)
+      textOutput("matchDescription"),
+      plotOutput("matchResultPlot", height = 400),
+      DT::dataTableOutput("matchResultTable"),
+      plotOutput("homeGoalsPlot", height = 200),
+      plotOutput("awayGoalsPlot", height = 200)
     )
   )
 )
 
 server <- function(input, output) {
   
+  output$matchDescription <- renderText(paste(input$home_team, " v ", input$away_team))
+  
   output$homeGoalsPlot <- renderPlot({
-    
     home_team <- input$home_team
     away_team <- input$away_team
     
@@ -109,9 +113,7 @@ server <- function(input, output) {
            aes(seq_along(home_goal_probabilities) -1, 
                home_goal_probabilities)) +
       geom_bar(stat = "identity") +
-      labs(x="Goals", 
-           y="Probability", 
-           title="Home Goals - Probability") +
+      labs(x=home_team, y="Probability", title=paste(home_team, " (Home) Goals - Probability")) +
       theme_minimal() +
       scale_x_continuous(labels=c(0:5), breaks=c(0:5)) +
       theme(plot.title = element_text(hjust = 0.5))
@@ -128,9 +130,7 @@ server <- function(input, output) {
            aes(seq_along(away_goal_probabilities) -1, 
                away_goal_probabilities)) +
       geom_bar(stat = "identity") +
-      labs(x="Goals", 
-           y="Probability", 
-           title = "Away Goals - Probability") +
+      labs(x=away_team, y="Probability", title=paste(away_team, " (Away) Goals - Probability")) +
       theme_minimal()  +
       scale_x_continuous(labels=c(0:5), breaks=c(0:5)) +
       theme(plot.title = element_text(hjust = 0.5))
@@ -158,9 +158,7 @@ server <- function(input, output) {
       geom_tile(aes(fill=value)) + 
       geom_text(aes(label = value)) +
       scale_fill_gradient(low="grey90", high="red") +
-      labs(x="Home Goals", 
-           y="Away Goals", 
-           title="Match Score Probability") +
+      labs(x=paste(home_team, " (Home) Goals"), y=paste(away_team, " (Away) Goals"), title="Match Score Probability") +
       theme_minimal() +
       scale_x_discrete(labels=c(0:5), breaks=c(0:5)) +
       scale_x_discrete(labels=c(0:5), breaks=c(0:5)) +
@@ -168,7 +166,7 @@ server <- function(input, output) {
       theme(plot.title = element_text(hjust = 0.5))
   })
   
-  output$matchResultTable <- renderTable({
+  output$matchResultTable <- DT::renderDataTable({
     home_team <- input$home_team
     away_team <- input$away_team
     
@@ -181,13 +179,15 @@ server <- function(input, output) {
     
     probability_matrix_long <- melt(probability_matrix)
     
-    names(probability_matrix_long) <- c("Home Goals", "Away Goals", "Probability")
-    probability_matrix_long$value <- round(probability_matrix_long$Probability, 3)
-    probability_matrix_long$`Home Goals` <- as.factor(probability_matrix_long$`Home Goals`)
-    probability_matrix_long$`Away Goals` <- as.factor(probability_matrix_long$`Away Goals`)
-    probability_matrix_long <- probability_matrix_long %>% arrange(desc(value))
+    probability_matrix_long$value <- round(probability_matrix_long$value, 3)
+    probability_matrix_long$Var1 <- as.factor(probability_matrix_long$Var1)
+    probability_matrix_long$Var2 <- as.factor(probability_matrix_long$Var2)
     
-    head(probability_matrix_long, 5)
+    names(probability_matrix_long) <- c(home_team, away_team, "Probability")
+    
+    probability_matrix_long <- probability_matrix_long %>% arrange(desc(Probability))
+    
+    DT::datatable(head(probability_matrix_long, 5), options = list(dom = 't'), rownames= FALSE)
   })
 }
 
