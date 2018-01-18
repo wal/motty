@@ -1,0 +1,10 @@
+name: motty
+title:
+username:
+account: walmc
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 257870
+bundleId: 1180593
+url: https://walmc.shinyapps.io/motty/
+when: 1516230095.51026

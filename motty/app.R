@@ -73,7 +73,7 @@ away_goal_probability_distribution <- function(home_team, away_team) {
 
 # Define UI for app that draws a histogram ----
 ui <- fluidPage(
-  titlePanel("EPL 2017/2018 - Results Predictor"),
+  titlePanel("EPL 2017/2018"),
   
   sidebarLayout(
     sidebarPanel(
@@ -89,6 +89,7 @@ ui <- fluidPage(
     
     mainPanel(
       plotOutput(outputId = "matchResultPlot", height = 400),
+      tableOutput("matchResultTable"),
       plotOutput(outputId = "homeGoalsPlot", height = 200),
       plotOutput(outputId = "awayGoalsPlot", height = 200)
     )
@@ -165,6 +166,28 @@ server <- function(input, output) {
       scale_x_discrete(labels=c(0:5), breaks=c(0:5)) +
       guides(fill=FALSE) +
       theme(plot.title = element_text(hjust = 0.5))
+  })
+  
+  output$matchResultTable <- renderTable({
+    home_team <- input$home_team
+    away_team <- input$away_team
+    
+    home_goal_probabilities <- home_goal_probability_distribution(home_team, away_team)
+    away_goal_probabilities <- away_goal_probability_distribution(home_team, away_team)
+    
+    probability_matrix <- outer(home_goal_probabilities, away_goal_probabilities)
+    rownames(probability_matrix) <- seq(0,5)
+    colnames(probability_matrix) <- seq(0,5)
+    
+    probability_matrix_long <- melt(probability_matrix)
+    
+    names(probability_matrix_long) <- c("Home Goals", "Away Goals", "Probability")
+    probability_matrix_long$value <- round(probability_matrix_long$Probability, 3)
+    probability_matrix_long$`Home Goals` <- as.factor(probability_matrix_long$`Home Goals`)
+    probability_matrix_long$`Away Goals` <- as.factor(probability_matrix_long$`Away Goals`)
+    probability_matrix_long <- probability_matrix_long %>% arrange(desc(value))
+    
+    head(probability_matrix_long, 5)
   })
 }
 
