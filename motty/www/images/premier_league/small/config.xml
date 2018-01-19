@@ -1,0 +1,33 @@
+<record>
+	<!-- FMSCOUT.COM -->
+
+	<!-- dont preload anything in this folder -->
+	<boolean id="preload" value="false"/>
+
+	<!-- turn off auto mapping -->
+	<boolean id="amap" value="false"/>
+
+	<list id="maps">
+		<record from="EPL2016" to="graphics/pictures/comp/11/icon"/>
+		<record from="600" to="graphics/pictures/club/600/icon"/>
+		<record from="602" to="graphics/pictures/club/602/icon"/>
+		<record from="618" to="graphics/pictures/club/618/icon"/>
+		<record from="622" to="graphics/pictures/club/622/icon"/>
+		<record from="630" to="graphics/pictures/club/630/icon"/>
+		<record from="642" to="graphics/pictures/club/642/icon"/>
+		<record from="650" to="graphics/pictures/club/650/icon"/>
+		<record from="664" to="graphics/pictures/club/664/icon"/>
+		<record from="673" to="graphics/pictures/club/673/icon"/>
+		<record from="676" to="graphics/pictures/club/676/icon"/>
+		<record from="679" to="graphics/pictures/club/679/icon"/>
+		<record from="680" to="graphics/pictures/club/680/icon"/>
+		<record from="688" to="graphics/pictures/club/688/icon"/>
+		<record from="713" to="graphics/pictures/club/713/icon"/>
+		<record from="721" to="graphics/pictures/club/721/icon"/>
+		<record from="724" to="graphics/pictures/club/724/icon"/>
+		<record from="728" to="graphics/pictures/club/728/icon"/>
+		<record from="732" to="graphics/pictures/club/732/icon"/>
+		<record from="734" to="graphics/pictures/club/734/icon"/>
+		<record from="735" to="graphics/pictures/club/735/icon"/>
+	</list>
+</record>

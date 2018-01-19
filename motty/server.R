@@ -6,51 +6,29 @@ library(data.table)
 library(ggplot2)
 library(DT)
 
-premier_league_2017_2018_url <- "http://www.football-data.co.uk/mmz4281/1718/E0.csv"
+source('R/data_helper.R', local = TRUE)
 
-data <- read.csv(premier_league_2017_2018_url, stringsAsFactors = FALSE)
-
-average_goals <- mean(data$FTHG + data$FTAG)
-
-home_data <- data %>% 
-  group_by(HomeTeam) %>%
-  summarise(HomeMatchesPlayed = n(),
-            HomeGoalsScored = sum(FTHG),
-            HomeGoalsScoredAverage = HomeGoalsScored / n(),
-            HomeGoalsConceeded = sum(FTAG),
-            HomeGoalsConceededAverage = HomeGoalsConceeded / n()) %>%
-  rename(Team = HomeTeam) %>%
-  arrange(Team)
-
-away_data <- data %>% 
-  group_by(AwayTeam) %>%
-  summarise(AwayMatchesPlayed = n(),
-            AwayGoalsScored = sum(FTAG),
-            AwayGoalsScoredAverage = AwayGoalsScored / n(),
-            AwayGoalsConceeded = sum(FTHG),
-            AwayGoalsConceededAverage = AwayGoalsConceeded / n()) %>%
-  rename(Team = AwayTeam) %>%
-  arrange(Team)
-
-season_goals_data <- bind_cols(home_data, away_data) %>% 
-  select(Team, 
-         HomeMatchesPlayed,
-         HomeGoalsScored, HomeGoalsScoredAverage, 
-         HomeGoalsConceeded, HomeGoalsConceededAverage, 
-         AwayMatchesPlayed,
-         AwayGoalsScored, AwayGoalsScoredAverage,
-         AwayGoalsConceeded, AwayGoalsConceededAverage)
-
-average_league_home_goals = mean(data$FTHG)
-average_league_away_goals = mean(data$FTAG)
-
-season_attack_defence_strengths <- season_goals_data %>%
-  mutate(HomeAttackStrength = HomeGoalsScoredAverage / average_league_home_goals,
-         HomeDefenceStrength = HomeGoalsConceededAverage/ average_league_away_goals,
-         AwayAttackStrength = AwayGoalsScoredAverage / average_league_away_goals,
-         AwayDefenceStrength = AwayGoalsConceededAverage / average_league_home_goals)
-
-teams = unique(season_attack_defence_strengths$Team)
+team_logos_map = list("Arsenal" = "602.png",
+                      "Bournemouth" = "600.png",
+                      "Brighton" = "618.png",
+                      "Burnley" = "622.png",       
+                      "Chelsea" = "630.png",
+                      "Crystal Palace" = "642.png",
+                      "Everton" = "650.png",
+                      "Huddersfield" = "664.png",
+                      "Leicester" = "673.png",
+                      "Liverpool" = "676.png",
+                      "Man City" = "679.png",
+                      "Man United" = "680.png",
+                      "Newcastle" = "688.png",
+                      "Southampton" = "713.png",
+                      "Stoke" = "721.png",
+                      "Swansea" = "714.png",       
+                      "Tottenham" = "718.png",
+                      "Watford" = "732.png",
+                      "West Brom" = "734.png",
+                      "West Ham" = "735.png"     
+)
 
 home_goal_probability_distribution <- function(home_team, away_team) {
   home_team_data = season_attack_defence_strengths %>% filter(Team == home_team)
@@ -74,43 +52,60 @@ away_goal_probability_distribution <- function(home_team, away_team) {
   return(dpois(0:5,expected_away_goals))
 }
 
-# Define UI for app that draws a histogram ----
-ui <- fluidPage(
-  titlePanel("EPL 2017/2018"),
-  
-  sidebarLayout(
-    sidebarPanel(
-      selectInput(inputId = "home_team",
-                  label = "Home Team:",
-                  choices = teams,
-                  selected = head(teams, 1)),
-      
-      selectInput(inputId = "away_team",
-                  label = "Away Team:",
-                  choices = teams,
-                  selected = tail(teams, 1))
-    ),
-    
-    mainPanel(
-      textOutput("matchDescription"),
-      tableOutput("matchProjection"),
-      plotOutput("matchResultPlot", height = 400),
-      DT::dataTableOutput("matchResultTable"),
-      tableOutput("homeSummaryTable"),
-      tableOutput("awaySummaryTable"),
-      plotOutput("homeGoalsPlot", height = 200),
-      plotOutput("awayGoalsPlot", height = 200)
-    )
-  )
-)
+logo_url_for_team <- function(team_name) {
+  paste("images/premier_league/",team_logos_map[team_name], sep="")
+}
 
 server <- function(input, output) {
   
-  output$matchDescription <- renderText(paste(input$home_team, " v ", input$away_team))
-
-  output$homeSummaryTable <- renderTable({ 
+  home_team <- reactive(input$home_team)
+  away_team <- reactive(input$away_team)
+  
+  output$home_team_logo <- renderUI({
+    tags$img(src = logo_url_for_team(home_team()), width=120)
+  })
+  
+  output$away_team_logo <- renderUI({
+    tags$img(src = logo_url_for_team(away_team()), width=120)
+  })
+  
+  output$match_outcome_probabilities <- renderTable({
     home_team <- input$home_team
-    home_team_home_stats <- season_attack_defence_strengths %>% filter(Team == home_team)
+    away_team <- input$away_team
+    
+    home_goal_probabilities <- home_goal_probability_distribution(home_team, away_team)
+    away_goal_probabilities <- away_goal_probability_distribution(home_team, away_team)
+    
+    probability_matrix <- outer(home_goal_probabilities, away_goal_probabilities)
+    rownames(probability_matrix) <- seq(0,5)
+    colnames(probability_matrix) <- seq(0,5)
+    
+    longData <- melt(probability_matrix)
+    
+    home_win_probability <- longData %>% 
+      filter(Var1 > Var2) %>%
+      summarise(Probability = sum(value)) %>%
+      .$Probability
+    
+    draw_probability <- longData %>% 
+      filter(Var1 == Var2) %>%
+      summarise(Probability = sum(value)) %>%
+      .$Probability
+    
+    away_win_probability <- longData %>% 
+      filter(Var1 < Var2) %>%
+      summarise(Probability = sum(value)) %>%
+      .$Probability
+    
+    data.table(
+      "Home Win" = paste(round(home_win_probability * 100, 2), " %"),
+      "Draw" = paste(round(draw_probability * 100, 2), " %"),
+      "Away Win" =paste(round(away_win_probability * 100, 2), " %")
+    )
+  })
+  
+  output$homeSummaryTable <- renderTable({ 
+    home_team_home_stats <- season_attack_defence_strengths %>% filter(Team == home_team())
     
     data.table(home_team = c("Home Matches Played",
                              "Home Goals Scored",
@@ -132,8 +127,7 @@ server <- function(input, output) {
   
   
   output$awaySummaryTable <- renderTable({ 
-    away_team <- input$away_team
-    away_team_away_stats <- season_attack_defence_strengths %>% filter(Team == away_team) 
+    away_team_away_stats <- season_attack_defence_strengths %>% filter(Team == away_team()) 
     
     data.table(away_team = 
                  c("Away Matches Played",
@@ -156,16 +150,14 @@ server <- function(input, output) {
   })
   
   output$homeGoalsPlot <- renderPlot({
-    home_team <- input$home_team
-    away_team <- input$away_team
-    
-    home_goal_probabilities <- home_goal_probability_distribution(home_team, away_team)
+
+    home_goal_probabilities <- home_goal_probability_distribution(home_team(), away_team())
     
     ggplot(data.frame(home_goal_probabilities), 
            aes(seq_along(home_goal_probabilities) -1, 
                home_goal_probabilities)) +
       geom_bar(stat = "identity") +
-      labs(x=home_team, y="Probability", title=paste(home_team, " (Home) Goals - Probability")) +
+      labs(x=home_team(), y="Probability", title=paste(home_team(), " (Home) Goals - Probability")) +
       theme_minimal() +
       scale_x_continuous(labels=c(0:5), breaks=c(0:5)) +
       theme(plot.title = element_text(hjust = 0.5))
@@ -241,41 +233,4 @@ server <- function(input, output) {
     
     DT::datatable(head(probability_matrix_long, 5), options = list(dom = 't'), rownames= FALSE)
   })
-  
-  output$matchProjection <- renderTable({
-    
-    home_team <- input$home_team
-    away_team <- input$away_team
-    
-    home_goal_probabilities <- home_goal_probability_distribution(home_team, away_team)
-    away_goal_probabilities <- away_goal_probability_distribution(home_team, away_team)
-    
-    probability_matrix <- outer(home_goal_probabilities, away_goal_probabilities)
-    rownames(probability_matrix) <- seq(0,5)
-    colnames(probability_matrix) <- seq(0,5)
-    
-    longData <- melt(probability_matrix)
-
-    home_win_probability <- longData %>% 
-      filter(Var1 > Var2) %>%
-      summarise(Probability = sum(value)) %>%
-      .$Probability
-    
-    draw_probability <- longData %>% 
-      filter(Var1 == Var2) %>%
-      summarise(Probability = sum(value)) %>%
-      .$Probability
-    
-    away_win_probability <- longData %>% 
-      filter(Var1 < Var2) %>%
-      summarise(Probability = sum(value)) %>%
-      .$Probability
-    
-    data.table("Home Win" = c(home_win_probability), 
-               Draw = c(draw_probability), 
-               "Away Win" = c(away_win_probability))
-  })
 }
-
-# Create Shiny app ----
-shinyApp(ui = ui, server = server)
