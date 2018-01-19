@@ -14,7 +14,8 @@ average_goals <- mean(data$FTHG + data$FTAG)
 
 home_data <- data %>% 
   group_by(HomeTeam) %>%
-  summarise(HomeGoalsScored = sum(FTHG),
+  summarise(HomeMatchesPlayed = n(),
+            HomeGoalsScored = sum(FTHG),
             HomeGoalsScoredAverage = HomeGoalsScored / n(),
             HomeGoalsConceeded = sum(FTAG),
             HomeGoalsConceededAverage = HomeGoalsConceeded / n()) %>%
@@ -23,7 +24,8 @@ home_data <- data %>%
 
 away_data <- data %>% 
   group_by(AwayTeam) %>%
-  summarise(AwayGoalsScored = sum(FTAG),
+  summarise(AwayMatchesPlayed = n(),
+            AwayGoalsScored = sum(FTAG),
             AwayGoalsScoredAverage = AwayGoalsScored / n(),
             AwayGoalsConceeded = sum(FTHG),
             AwayGoalsConceededAverage = AwayGoalsConceeded / n()) %>%
@@ -32,8 +34,10 @@ away_data <- data %>%
 
 season_goals_data <- bind_cols(home_data, away_data) %>% 
   select(Team, 
+         HomeMatchesPlayed,
          HomeGoalsScored, HomeGoalsScoredAverage, 
          HomeGoalsConceeded, HomeGoalsConceededAverage, 
+         AwayMatchesPlayed,
          AwayGoalsScored, AwayGoalsScoredAverage,
          AwayGoalsConceeded, AwayGoalsConceededAverage)
 
@@ -44,11 +48,9 @@ season_attack_defence_strengths <- season_goals_data %>%
   mutate(HomeAttackStrength = HomeGoalsScoredAverage / average_league_home_goals,
          HomeDefenceStrength = HomeGoalsConceededAverage/ average_league_away_goals,
          AwayAttackStrength = AwayGoalsScoredAverage / average_league_away_goals,
-         AwayDefenceStrength = AwayGoalsConceededAverage / average_league_home_goals) %>%
-  select(Team, HomeAttackStrength, HomeDefenceStrength, AwayAttackStrength, AwayDefenceStrength)
+         AwayDefenceStrength = AwayGoalsConceededAverage / average_league_home_goals)
 
 teams = unique(season_attack_defence_strengths$Team)
-
 
 home_goal_probability_distribution <- function(home_team, away_team) {
   home_team_data = season_attack_defence_strengths %>% filter(Team == home_team)
@@ -91,8 +93,11 @@ ui <- fluidPage(
     
     mainPanel(
       textOutput("matchDescription"),
+      tableOutput("matchProjection"),
       plotOutput("matchResultPlot", height = 400),
       DT::dataTableOutput("matchResultTable"),
+      tableOutput("homeSummaryTable"),
+      tableOutput("awaySummaryTable"),
       plotOutput("homeGoalsPlot", height = 200),
       plotOutput("awayGoalsPlot", height = 200)
     )
@@ -102,6 +107,53 @@ ui <- fluidPage(
 server <- function(input, output) {
   
   output$matchDescription <- renderText(paste(input$home_team, " v ", input$away_team))
+
+  output$homeSummaryTable <- renderTable({ 
+    home_team <- input$home_team
+    home_team_home_stats <- season_attack_defence_strengths %>% filter(Team == home_team)
+    
+    data.table(home_team = c("Home Matches Played",
+                             "Home Goals Scored",
+                             "Home Goals Scored Average",
+                             "Home Attack Strength", 
+                             "Home Goals Conceeded",
+                             "Home Goals Conceeded Average",
+                             "Home Defence Strength"), 
+               "Value" = c(home_team_home_stats$HomeMatchesPlayed,
+                           home_team_home_stats$HomeGoalsScored, 
+                           home_team_home_stats$HomeGoalsScoredAverage, 
+                           home_team_home_stats$HomeAttackStrength, 
+                           home_team_home_stats$HomeGoalsConceeded,
+                           home_team_home_stats$HomeGoalsConceededAverage,
+                           home_team_home_stats$HomeDefenceStrength
+               )
+    )
+  })
+  
+  
+  output$awaySummaryTable <- renderTable({ 
+    away_team <- input$away_team
+    away_team_away_stats <- season_attack_defence_strengths %>% filter(Team == away_team) 
+    
+    data.table(away_team = 
+                 c("Away Matches Played",
+                 "Away Goals Scored",
+                 "Away Goals Scored Average",
+                 "Away Attack Strength", 
+                 "Away Goals Conceeded",
+                 "Away Goals Conceeded Average",
+                 "Away Defence Strength"), 
+               "Value" = 
+                 c(away_team_away_stats$AwayMatchesPlayed,
+                 away_team_away_stats$AwayGoalsScored, 
+                 away_team_away_stats$AwayGoalsScoredAverage, 
+                 away_team_away_stats$AwayAttackStrength, 
+                 away_team_away_stats$AwayGoalsConceeded,
+                 away_team_away_stats$AwayGoalsConceededAverage,
+                 away_team_away_stats$AwayDefenceStrength
+                 )
+               )
+  })
   
   output$homeGoalsPlot <- renderPlot({
     home_team <- input$home_team
@@ -188,6 +240,40 @@ server <- function(input, output) {
     probability_matrix_long <- probability_matrix_long %>% arrange(desc(Probability))
     
     DT::datatable(head(probability_matrix_long, 5), options = list(dom = 't'), rownames= FALSE)
+  })
+  
+  output$matchProjection <- renderTable({
+    
+    home_team <- input$home_team
+    away_team <- input$away_team
+    
+    home_goal_probabilities <- home_goal_probability_distribution(home_team, away_team)
+    away_goal_probabilities <- away_goal_probability_distribution(home_team, away_team)
+    
+    probability_matrix <- outer(home_goal_probabilities, away_goal_probabilities)
+    rownames(probability_matrix) <- seq(0,5)
+    colnames(probability_matrix) <- seq(0,5)
+    
+    longData <- melt(probability_matrix)
+
+    home_win_probability <- longData %>% 
+      filter(Var1 > Var2) %>%
+      summarise(Probability = sum(value)) %>%
+      .$Probability
+    
+    draw_probability <- longData %>% 
+      filter(Var1 == Var2) %>%
+      summarise(Probability = sum(value)) %>%
+      .$Probability
+    
+    away_win_probability <- longData %>% 
+      filter(Var1 < Var2) %>%
+      summarise(Probability = sum(value)) %>%
+      .$Probability
+    
+    data.table("Home Win" = c(home_win_probability), 
+               Draw = c(draw_probability), 
+               "Away Win" = c(away_win_probability))
   })
 }
 
