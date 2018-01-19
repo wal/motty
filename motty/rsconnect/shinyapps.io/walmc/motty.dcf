@@ -5,8 +5,8 @@ account: walmc
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 257870
-bundleId: 1181249
+bundleId: 1183703
 url: https://walmc.shinyapps.io/motty/
-when: 1516271342.12165
+when: 1516393855.99342
 asMultiple: FALSE
 asStatic: FALSE

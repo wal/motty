@@ -1,3 +1,4 @@
+library(tidyverse)
 
 premier_league_2017_2018_url <- "http://www.football-data.co.uk/mmz4281/1718/E0.csv"
 
