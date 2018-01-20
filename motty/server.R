@@ -65,6 +65,19 @@ server <- function(input, output) {
   home_goal_probabilities <- reactive(home_goal_probability_distribution(home_team(), away_team()))
   away_goal_probabilities <- reactive(away_goal_probability_distribution(home_team(), away_team()))
   
+  long_data <- reactive({
+    probability_matrix <- outer(home_goal_probabilities(), away_goal_probabilities())
+    rownames(probability_matrix) <- seq(0,5)
+    colnames(probability_matrix) <- seq(0,5)
+    
+    longData <- melt(probability_matrix)
+    longData$value <- round(longData$value, 3)
+    longData$Var1 <- as.factor(longData$Var1)
+    longData$Var2 <- as.factor(longData$Var2)
+    
+    longData
+  })
+  
   output$home_team_logo <- renderUI({
     tags$img(src = logo_url_for_team(home_team()), width=120)
   })
@@ -174,17 +187,7 @@ server <- function(input, output) {
   
   output$matchResultPlot <- renderPlot({
     
-    probability_matrix <- outer(home_goal_probabilities(), away_goal_probabilities())
-    rownames(probability_matrix) <- seq(0,5)
-    colnames(probability_matrix) <- seq(0,5)
-    
-    longData <- melt(probability_matrix)
-    longData$value <- round(longData$value, 3)
-    longData$Var1 <- as.factor(longData$Var1)
-    longData$Var2 <- as.factor(longData$Var2)
-    longData %>% arrange(desc(value))
-
-    ggplot(longData, aes(x = Var1, y = Var2)) + 
+    ggplot(long_data(), aes(x = Var1, y = Var2)) + 
       geom_tile(aes(fill=value)) + 
       geom_text(aes(label = value)) +
       scale_fill_gradient(low="grey90", high="red") +
@@ -198,16 +201,7 @@ server <- function(input, output) {
   
   output$matchResultTable <- DT::renderDataTable({
 
-    probability_matrix <- outer(home_goal_probabilities(), away_goal_probabilities())
-    rownames(probability_matrix) <- seq(0,5)
-    colnames(probability_matrix) <- seq(0,5)
-    
-    probability_matrix_long <- melt(probability_matrix)
-    
-    probability_matrix_long$value <- round(probability_matrix_long$value, 3)
-    probability_matrix_long$Var1 <- as.factor(probability_matrix_long$Var1)
-    probability_matrix_long$Var2 <- as.factor(probability_matrix_long$Var2)
-    
+    probability_matrix_long <- long_data()
     names(probability_matrix_long) <- c(home_team(), away_team(), "Probability")
     
     probability_matrix_long <- probability_matrix_long %>% arrange(desc(Probability))
