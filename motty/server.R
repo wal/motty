@@ -62,6 +62,9 @@ server <- function(input, output) {
   home_team <- reactive(input$home_team)
   away_team <- reactive(input$away_team)
   
+  home_goal_probabilities <- reactive(home_goal_probability_distribution(home_team(), away_team()))
+  away_goal_probabilities <- reactive(away_goal_probability_distribution(home_team(), away_team()))
+  
   output$home_team_logo <- renderUI({
     tags$img(src = logo_url_for_team(home_team()), width=120)
   })
@@ -71,13 +74,8 @@ server <- function(input, output) {
   })
   
   output$match_outcome_probabilities <- renderTable({
-    home_team <- input$home_team
-    away_team <- input$away_team
-    
-    home_goal_probabilities <- home_goal_probability_distribution(home_team, away_team)
-    away_goal_probabilities <- away_goal_probability_distribution(home_team, away_team)
-    
-    probability_matrix <- outer(home_goal_probabilities, away_goal_probabilities)
+
+    probability_matrix <- outer(home_goal_probabilities(), away_goal_probabilities())
     rownames(probability_matrix) <- seq(0,5)
     colnames(probability_matrix) <- seq(0,5)
     
@@ -152,11 +150,9 @@ server <- function(input, output) {
   
   output$homeGoalsPlot <- renderPlot({
 
-    home_goal_probabilities <- home_goal_probability_distribution(home_team(), away_team())
-    
-    ggplot(data.frame(home_goal_probabilities), 
-           aes(seq_along(home_goal_probabilities) -1, 
-               home_goal_probabilities)) +
+    ggplot(data.frame(home_goal_probabilities()), 
+           aes(seq_along(home_goal_probabilities()) -1, 
+               home_goal_probabilities())) +
       geom_bar(stat = "identity") +
       labs(x=home_team(), y="Probability", title=paste(home_team(), " (Home) Goals - Probability")) +
       theme_minimal() +
@@ -166,16 +162,11 @@ server <- function(input, output) {
   
   output$awayGoalsPlot <- renderPlot({
     
-    home_team <- input$home_team
-    away_team <- input$away_team
-    
-    away_goal_probabilities <- away_goal_probability_distribution(home_team, away_team)
-    
-    ggplot(data.frame(away_goal_probabilities), 
-           aes(seq_along(away_goal_probabilities) -1, 
-               away_goal_probabilities)) +
+    ggplot(data.frame(away_goal_probabilities()), 
+           aes(seq_along(away_goal_probabilities()) -1, 
+               away_goal_probabilities())) +
       geom_bar(stat = "identity") +
-      labs(x=away_team, y="Probability", title=paste(away_team, " (Away) Goals - Probability")) +
+      labs(x=away_team(), y="Probability", title=paste(away_team(), " (Away) Goals - Probability")) +
       theme_minimal()  +
       scale_x_continuous(labels=c(0:5), breaks=c(0:5)) +
       theme(plot.title = element_text(hjust = 0.5))
@@ -183,13 +174,7 @@ server <- function(input, output) {
   
   output$matchResultPlot <- renderPlot({
     
-    home_team <- input$home_team
-    away_team <- input$away_team
-    
-    home_goal_probabilities <- home_goal_probability_distribution(home_team, away_team)
-    away_goal_probabilities <- away_goal_probability_distribution(home_team, away_team)
-    
-    probability_matrix <- outer(home_goal_probabilities, away_goal_probabilities)
+    probability_matrix <- outer(home_goal_probabilities(), away_goal_probabilities())
     rownames(probability_matrix) <- seq(0,5)
     colnames(probability_matrix) <- seq(0,5)
     
@@ -203,7 +188,7 @@ server <- function(input, output) {
       geom_tile(aes(fill=value)) + 
       geom_text(aes(label = value)) +
       scale_fill_gradient(low="grey90", high="red") +
-      labs(x=paste(home_team, " (Home) Goals"), y=paste(away_team, " (Away) Goals"), title="Match Score Probability") +
+      labs(x=paste(home_team(), " (Home) Goals"), y=paste(away_team(), " (Away) Goals"), title="Match Score Probability") +
       theme_minimal() +
       scale_x_discrete(labels=c(0:5), breaks=c(0:5)) +
       scale_x_discrete(labels=c(0:5), breaks=c(0:5)) +
@@ -212,13 +197,8 @@ server <- function(input, output) {
   })
   
   output$matchResultTable <- DT::renderDataTable({
-    home_team <- input$home_team
-    away_team <- input$away_team
-    
-    home_goal_probabilities <- home_goal_probability_distribution(home_team, away_team)
-    away_goal_probabilities <- away_goal_probability_distribution(home_team, away_team)
-    
-    probability_matrix <- outer(home_goal_probabilities, away_goal_probabilities)
+
+    probability_matrix <- outer(home_goal_probabilities(), away_goal_probabilities())
     rownames(probability_matrix) <- seq(0,5)
     colnames(probability_matrix) <- seq(0,5)
     
@@ -228,7 +208,7 @@ server <- function(input, output) {
     probability_matrix_long$Var1 <- as.factor(probability_matrix_long$Var1)
     probability_matrix_long$Var2 <- as.factor(probability_matrix_long$Var2)
     
-    names(probability_matrix_long) <- c(home_team, away_team, "Probability")
+    names(probability_matrix_long) <- c(home_team(), away_team(), "Probability")
     
     probability_matrix_long <- probability_matrix_long %>% arrange(desc(Probability))
     
